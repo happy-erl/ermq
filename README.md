@@ -34,7 +34,7 @@ Add `ermq` to your project's dependencies in `rebar.config`:
 
 ```erlang
 {deps, [
-    {ermq, "0.1.0", {git, "https://github.com/UGOtang/ermq.git", {branch, "main"}}}
+    {ermq, "0.1.0", {git, "https://github.com/happy-erl/ermq.git", {branch, "main"}}}
 ]}.
 ```
 
@@ -49,7 +49,7 @@ rebar3 compile
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/UGOtang/ermq.git
+   git clone https://github.com/happy-erl/ermq.git
    cd ermq
    ```
 
@@ -198,4 +198,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Copyright
 
-Copyright 2025, UGOtang <tangqihangzhang@163.com>.
+Copyright 2025, happy-erl <tangqihangzhang@163.com>.

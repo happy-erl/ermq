@@ -1,28 +1,28 @@
 -module(ermq_utils_tests).
 -include_lib("eunit/include/eunit.hrl").
 
-%% 测试 UUID 生成格式
+%% Test UUID generation format
 uuid_test() ->
     UUID = ermq_utils:v4(),
-    %% 检查是否为二进制
+    %% Check if it's binary
     ?assert(is_binary(UUID)),
-    %% UUID 标准长度为 36
+    %% UUID standard length is 36
     ?assertEqual(36, byte_size(UUID)),
-    %% 简单检查中间是否有连字符
+    %% Simple check if there are hyphens in the middle
     ?assertEqual($-, binary:at(UUID, 8)),
     ?assertEqual($-, binary:at(UUID, 13)).
 
-%% 测试 Redis Key 拼接
+%% Test Redis Key concatenation
 to_key_test() ->
     Prefix = <<"bull">>,
-    %% 测试单一部分拼接
+    %% Test single part concatenation
     ?assertEqual(<<"bull:myqueue">>, ermq_utils:to_key(Prefix, "myqueue")),
-    %% 测试多部分拼接
+    %% Test multiple parts concatenation
     ?assertEqual(<<"bull:myqueue:123">>, ermq_utils:to_key(Prefix, ["myqueue", 123])),
-    %% 测试包含 binary 的拼接
+    %% Test concatenation with binary
     ?assertEqual(<<"bull:test:job">>, ermq_utils:to_key(Prefix, [<<"test">>, "job"])).
 
-%% 测试 JSON 编解码
+%% Test JSON encoding and decoding
 json_test() ->
     Map = #{<<"key">> => <<"value">>, <<"num">> => 123},
     Encoded = ermq_utils:json_encode(Map),
@@ -31,7 +31,7 @@ json_test() ->
     Decoded = ermq_utils:json_decode(Encoded),
     ?assertEqual(Map, Decoded).
 
-%% 测试空值检查
+%% Test empty value check
 is_empty_test() ->
     ?assert(ermq_utils:is_empty(undefined)),
     ?assert(ermq_utils:is_empty(null)),

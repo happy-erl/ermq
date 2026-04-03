@@ -215,3 +215,84 @@ For jobs that need to be deleted but are being processed:
 - **Security**: High - May cause task re-execution, leading to data inconsistency
 - **Reliability**: High - Tasks that should fail may be incorrectly re-executed
 - **Data Integrity**: High - Job state may become inconsistent
+
+## 9. Implemented Fixes
+
+### 9.1 Integration Test Fix (Completed)
+
+**Problem**: The integration test was passing empty parameters to `pause-7.lua` script, causing runtime errors.
+
+**Solution**: Modified `test/ermq_integration_tests.erl` to pass valid parameters:
+```erlang
+Keys = [
+    <<"ermq:test:wait">>,           % KEYS[1] wait or paused
+    <<"ermq:test:paused">>,         % KEYS[2] paused or wait
+    <<"ermq:test:meta">>,           % KEYS[3] meta
+    <<"ermq:test:prioritized">>,    % KEYS[4] prioritized
+    <<"ermq:test:events">>,         % KEYS[5] events stream
+    <<"ermq:test:delayed">>,        % KEYS[6] delayed
+    <<"ermq:test:marker">>          % KEYS[7] marker
+],
+Args = [<<"resumed">>],             % ARGV[1] paused or resumed
+```
+
+**Result**: All 14 tests now pass with 0 failures. The script runs successfully with `{ok, undefined}` result.
+
+### 9.2 Redis Key Construction Fix (Completed)
+
+**Problem**: Redis keys were not properly constructed with queue names, causing WRONGTYPE errors.
+
+**Solution**: Modified `src/ermq_job.erl` to properly construct keys with queue names:
+```erlang
+prepare_add_script(Prefix, QueueName, JobId, Name, Timestamp, Delay, Priority, PackedOpts, JsonData) ->
+    WaitKey = ermq_utils:to_key(Prefix, [QueueName, <<"wait">>]),
+    PausedKey = ermq_utils:to_key(Prefix, [QueueName, <<"paused">>]),
+    MetaKey = ermq_utils:to_key(Prefix, [QueueName, <<"meta">>]),
+    %% ... other keys with queue name
+```
+
+### 9.3 Lua Script Key Selection Fix (Completed)
+
+**Problem**: Wrong number of keys were being passed to Lua scripts.
+
+**Solution**: Modified `prepare_add_script` to select appropriate keys based on script type:
+```erlang
+if
+    Delay > 0 ->
+        Keys = [MarkerKey, MetaKey, IdKey, DelayedKey, CompletedKey, EventsKey],
+        {'addDelayedJob-6', Keys, FinalArgs ++ [ermq_utils:to_binary(Delay)]};
+    Priority =/= undefined ->
+        Keys = [MarkerKey, MetaKey, IdKey, PrioritizedKey, DelayedKey, 
+                CompletedKey, ActiveKey, EventsKey, PriorityCounterKey],
+        {'addPrioritizedJob-9', Keys, FinalArgs ++ [ermq_utils:to_binary(Priority)]};
+    true ->
+        Keys = [WaitKey, PausedKey, MetaKey, IdKey, 
+                CompletedKey, DelayedKey, ActiveKey, EventsKey, MarkerKey],
+        {'addStandardJob-9', Keys, FinalArgs}
+end.
+```
+
+## 10. Current Status
+
+### 10.1 Test Results
+```
+Finished in 0.218 seconds
+14 tests, 0 failures
+```
+
+### 10.2 Remaining Issues
+The race conditions documented in this report (Sections 2-5) are design-level issues that exist in the original BullMQ implementation. These require careful consideration before implementing fixes, as they may affect the behavior of parent-child job dependencies and stalled job recovery.
+
+### 10.3 Recommendations
+1. **Short-term**: Monitor production systems for signs of race conditions
+2. **Medium-term**: Implement the suggested fixes in a staging environment
+3. **Long-term**: Consider implementing a more robust distributed locking mechanism
+
+---
+
+> [!META] Document Info
+> - Created: 2026-04-03
+> - Last Updated: 2026-04-03
+> - Status: Integration test fixed, core race conditions pending
+> - Related Files: `priv/lua/moveStalledJobsToWait-8.lua`, `priv/lua/includes/*.lua`
+> - Test Status: ✅ All 14 tests passing

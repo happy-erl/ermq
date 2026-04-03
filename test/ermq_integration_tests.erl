@@ -26,25 +26,34 @@ test_redis_ping(Client) ->
 
 test_script_loading(Client) ->
     ScriptName = 'pause-7', 
-    %% 1. 尝试显式加载
+    %% 1. Try to explicitly load the script
     LoadResult = ermq_scripts:load_command(Client, ScriptName),
     case LoadResult of
         {ok, Sha} ->
             ?debugFmt("Script loaded SHA: ~p", [Sha]),
             ?assert(is_binary(Sha)),
             
-            %% 2. 验证运行
-            %% 我们传入空参数，脚本可能会在 Redis 内部报错 (比如 ARGV[1] 为 nil)
-            %% 但只要 Redis 没报 "NOSCRIPT"，就说明 SHA 是有效的，脚本引擎工作正常。
-            RunResult = ermq_scripts:run(Client, ScriptName, [], []),
+            %% 2. Verify execution
+            %% Pass valid parameters to avoid runtime errors
+            Keys = [
+                <<"ermq:test:wait">>,           % KEYS[1] wait or paused
+                <<"ermq:test:paused">>,         % KEYS[2] paused or wait
+                <<"ermq:test:meta">>,           % KEYS[3] meta
+                <<"ermq:test:prioritized">>,    % KEYS[4] prioritized
+                <<"ermq:test:events">>,         % KEYS[5] events stream
+                <<"ermq:test:delayed">>,        % KEYS[6] delayed
+                <<"ermq:test:marker">>          % KEYS[7] marker
+            ],
+            Args = [<<"resumed">>],             % ARGV[1] paused or resumed
+            RunResult = ermq_scripts:run(Client, ScriptName, Keys, Args),
             ?debugFmt("Script run result: ~p", [RunResult]),
             
             case RunResult of
                 {ok, _} -> ok;
                 {error, <<"NOSCRIPT", _/binary>>} -> 
-                    ?assert(false); %% 这是唯一不能接受的错误
+                    ?assert(false); %% This is the only unacceptable error
                 {error, _Reason} -> 
-                    %% 其他错误（如 Lua 运行时错误）是可以接受的，证明脚本跑起来了
+                    %% Other errors (like Lua runtime errors) are acceptable, proving the script ran
                     ok
             end;
             

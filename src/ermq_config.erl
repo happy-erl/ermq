@@ -1,8 +1,8 @@
 %%%-------------------------------------------------------------------
-%%% @doc
+%%% -doc
 %%% Configuration management module.
 %%% Handles merging of user options with defaults for Queues and Workers.
-%%% @end
+%%% -end
 %%%-------------------------------------------------------------------
 -module(ermq_config).
 
@@ -10,13 +10,13 @@
 -export([new_queue_opts/1, new_worker_opts/1]).
 -export([get_redis_opts/1]).
 
--include("ermq.hrl").
+-include_lib("ermq/include/ermq.hrl").
 
 %%%===================================================================
 %%% API Functions
 %%%===================================================================
 
-%% @doc
+%% -doc
 %% Merges user provided queue options with defaults.
 %% @param Opts: A map containing queue configuration.
 %% @return A map with complete queue options.
@@ -28,7 +28,7 @@ new_queue_opts(Opts) when is_map(Opts) ->
     },
     maps:merge(Defaults, Opts).
 
-%% @doc
+%% -doc
 %% Merges user provided worker options with defaults.
 %% @param Opts: A map containing worker configuration.
 %% @return A map with complete worker options.
@@ -42,7 +42,7 @@ new_worker_opts(Opts) when is_map(Opts) ->
     },
     maps:merge(Defaults, Opts).
 
-%% @doc
+%% -doc
 %% Extracts or constructs Redis connection options for eredis.
 %% This adapts the BullMQ 'connection' object to eredis style.
 get_redis_opts(ConfigMap) ->

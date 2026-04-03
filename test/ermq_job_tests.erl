@@ -74,7 +74,7 @@ test_job_retrieval(Client) ->
     ?assertEqual(<<"custom-id-123">>, JobId),
 
     %% Retrieve Job
-    {ok, Job} = ermq_job:from_id(Client, ?TEST_PREFIX, JobId),
+    {ok, Job} = ermq_job:from_id(Client, ?TEST_PREFIX, ?TEST_QUEUE, JobId),
     
     %% Verify ID
     ?assertEqual(JobId, maps:get(id, Job)),
@@ -113,11 +113,11 @@ test_update_progress(Client) ->
     {ok, JobId} = ermq_job:add(Client, ?TEST_PREFIX, ?TEST_QUEUE, <<"progress-job">>, #{}),
     
     %% Update progress to 50
-    ProgressResult = ermq_job:update_progress(Client, ?TEST_PREFIX, JobId, 50),
+    ProgressResult = ermq_job:update_progress(Client, ?TEST_PREFIX, ?TEST_QUEUE, JobId, 50),
     ?assertMatch({ok, _}, ProgressResult),
     
     %% Verify via raw Redis HGET
-    JobKey = ermq_utils:to_key(?TEST_PREFIX, JobId),
+    JobKey = ermq_utils:to_key(?TEST_PREFIX, [?TEST_QUEUE, JobId]),
     {ok, ProgressVal} = ermq_redis:q(Client, ["HGET", JobKey, "progress"]),
     
     ?assertEqual(<<"50">>, ProgressVal).

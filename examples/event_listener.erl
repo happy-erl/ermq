@@ -48,7 +48,16 @@ run() ->
     %% 8. Stop listener
     io:format("~n=== Stopping event listener ===~n"),
     ListenerPid ! stop,
-    
+
+    %% Wait for listener to exit gracefully
+    monitor(process, ListenerPid),
+    receive
+        {'DOWN', _, process, ListenerPid, _} -> ok
+    after 2000 ->
+        io:format("Listener did not exit in time, force killing~n"),
+        exit(ListenerPid, kill)
+    end,
+
     %% 9. Check events stream
     io:format("~n=== Checking events stream ===~n"),
     {ok, EventCount} = ermq_redis:q(Client, ["XLEN", "ermq:test-queue:events"]),
@@ -62,29 +71,46 @@ run() ->
     ok.
 
 listen_events(Client) ->
-    %% Read events from the stream
-    case ermq_redis:q(Client, ["XREAD", "COUNT", "10", "BLOCK", "500", "STREAMS", "ermq:test-queue:events", "0"]) of
-        {ok, undefined} ->
-            %% Timeout, continue listening
-            listen_events(Client);
-        {ok, Events} ->
-            %% Process events
-            lists:foreach(fun([_Stream, EventList]) ->
-                lists:foreach(fun([Id, Fields]) ->
-                    io:format("~nEvent ID: ~s~n", [Id]),
-                    print_fields(Fields)
-                end, EventList)
-            end, Events),
-            listen_events(Client);
-        {error, _} ->
-            %% Error or stopped
-            ok
+    listen_events(Client, "0").
+
+listen_events(Client, LastId) ->
+    %% Check for stop message before blocking read
+    receive
+        stop -> ok
+    after 0 ->
+        %% Read events from the stream starting from last processed ID
+        case ermq_redis:q(Client, ["XREAD", "COUNT", "10", "BLOCK", "100", "STREAMS", "ermq:test-queue:events", LastId]) of
+            {ok, undefined} ->
+                %% Timeout, continue listening with same cursor
+                listen_events(Client, LastId);
+            {ok, Events} ->
+                %% Process events and update cursor
+                NewLastId = process_events(Events, LastId),
+                listen_events(Client, NewLastId);
+            {error, _} ->
+                %% Error or stopped
+                ok
+        end
     end.
 
 print_fields([]) -> ok;
 print_fields([Field, Value | Rest]) ->
     io:format("  ~s: ~s~n", [Field, Value]),
     print_fields(Rest).
+
+%% Process events and return the last event ID for cursor tracking
+process_events([], LastId) -> LastId;
+process_events([[_, EventList] | Rest], LastId) ->
+    NewId = process_event_list(EventList, LastId),
+    process_events(Rest, NewId).
+
+process_event_list([], LastId) -> LastId;
+process_event_list([[Id, Fields] | Rest], _) ->
+    %% Convert binary ID to string for display and next query
+    IdStr = binary_to_list(Id),
+    io:format("~nEvent ID: ~s~n", [IdStr]),
+    print_fields(Fields),
+    process_event_list(Rest, IdStr).
 
 cleanup(Client) ->
     {ok, Keys} = ermq_redis:q(Client, ["KEYS", "ermq:test-queue:*"]),
